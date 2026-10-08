@@ -1,5 +1,26 @@
 <resources>
     <string name="app_name">Stock Electrónico</string>
-    <string name="base_screen_title">Stock Electrónico</string>
-    <string name="base_screen_message">Proyecto base</string>
+    <string name="inventory_title">Inventario</string>
+    <string name="inventory_search_label">Buscar productos</string>
+    <string name="inventory_search_placeholder">Nombre o código SKU</string>
+    <string name="inventory_empty">No hay productos registrados.</string>
+    <string name="inventory_no_results">No se encontraron productos.</string>
+    <string name="inventory_error">No fue posible cargar el inventario. Inténtalo nuevamente.</string>
+    <string name="loading">Cargando…</string>
+    <string name="inventory_stock">Stock: %1$d</string>
+    <string name="inventory_code">Código: %1$s</string>
+    <string name="product_detail_title">Detalle del producto</string>
+    <string name="product_detail_not_found">El producto ya no está disponible.</string>
+    <string name="product_detail_error">No fue posible cargar el producto. Inténtalo nuevamente.</string>
+    <string name="product_detail_category">Categoría</string>
+    <string name="product_detail_brand">Marca</string>
+    <string name="product_detail_description">Descripción</string>
+    <string name="product_detail_price">Precio</string>
+    <string name="product_detail_stock">Stock disponible</string>
+    <string name="product_detail_channel">Canal de venta</string>
+    <string name="channel_branch">Sucursal</string>
+    <string name="channel_online">Online</string>
+    <string name="channel_both">Sucursal y online</string>
+    <string name="product_detail_code">Código / SKU</string>
+    <string name="navigation_back">Volver</string>
 </resources>

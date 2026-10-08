@@ -17,7 +17,10 @@ class MainActivity : ComponentActivity() {
         setContent {
             StockElectronicoTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    StockElectronicoNavHost()
+                    StockElectronicoNavHost(
+                        productoRepository = (application as StockElectronicoApplication)
+                            .appContainer.productoRepository
+                    )
                 }
             }
         }

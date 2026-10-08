@@ -1,49 +1,54 @@
 package com.example.stockelectronico.ui.navigation
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import android.net.Uri
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.example.stockelectronico.R
+import androidx.navigation.navArgument
+import com.example.stockelectronico.domain.repository.ProductoRepository
+import com.example.stockelectronico.ui.detail.ProductDetailScreen
+import com.example.stockelectronico.ui.detail.ProductDetailViewModel
+import com.example.stockelectronico.ui.detail.ProductDetailViewModelFactory
+import com.example.stockelectronico.ui.inventory.InventoryScreen
+import com.example.stockelectronico.ui.inventory.InventoryViewModel
+import com.example.stockelectronico.ui.inventory.InventoryViewModelFactory
 
-private const val BASE_ROUTE = "base"
+private const val INVENTORY_ROUTE = "inventory"
+private const val DETAIL_ROUTE = "product_detail"
+private const val PRODUCT_ID_ARGUMENT = "productId"
 
 @Composable
-fun StockElectronicoNavHost() {
+fun StockElectronicoNavHost(productoRepository: ProductoRepository) {
     val navController = rememberNavController()
 
     NavHost(
         navController = navController,
-        startDestination = BASE_ROUTE
+        startDestination = INVENTORY_ROUTE
     ) {
-        composable(BASE_ROUTE) {
-            BaseScreen()
+        composable(INVENTORY_ROUTE) {
+            val viewModel: InventoryViewModel = viewModel(
+                factory = InventoryViewModelFactory(productoRepository)
+            )
+            InventoryScreen(viewModel) { productId ->
+                navController.navigate("$DETAIL_ROUTE/${Uri.encode(productId)}")
+            }
         }
-    }
-}
-
-@Composable
-private fun BaseScreen() {
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text(
-            text = stringResource(R.string.base_screen_title),
-            style = MaterialTheme.typography.headlineSmall
-        )
-        Text(
-            text = stringResource(R.string.base_screen_message),
-            style = MaterialTheme.typography.bodyLarge
-        )
+        composable(
+            route = "$DETAIL_ROUTE/{$PRODUCT_ID_ARGUMENT}",
+            arguments = listOf(navArgument(PRODUCT_ID_ARGUMENT) { type = NavType.StringType })
+        ) { entry ->
+            val productId = entry.arguments
+                ?.getString(PRODUCT_ID_ARGUMENT)
+                ?.let { encodedId -> runCatching { Uri.decode(encodedId) }.getOrNull() }
+                .orEmpty()
+            val viewModel: ProductDetailViewModel = viewModel(
+                key = productId,
+                factory = ProductDetailViewModelFactory(productId, productoRepository)
+            )
+            ProductDetailScreen(viewModel, onBack = navController::popBackStack)
+        }
     }
 }
