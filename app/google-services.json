@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "828196603649",
+    "project_id": "stockelectronico-5e3da",
+    "storage_bucket": "stockelectronico-5e3da.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:828196603649:android:89ae47ec7d82c3a4277d00",
+        "android_client_info": {
+          "package_name": "com.example.stockelectronico"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAiAZsNb7ME2tqWaZUjjH5ntWkLRVRvHVQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

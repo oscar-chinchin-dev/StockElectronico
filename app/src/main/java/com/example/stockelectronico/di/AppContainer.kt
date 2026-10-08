@@ -2,6 +2,8 @@ package com.example.stockelectronico.di
 
 import android.content.Context
 import androidx.room.Room
+import com.example.stockelectronico.data.remote.FirebaseConnectionVerifier
+import com.example.stockelectronico.data.remote.auth.FirebaseAuthManager
 import com.example.stockelectronico.data.local.database.StockElectronicoDatabase
 import com.example.stockelectronico.data.repository.LocalProductoRepository
 import com.example.stockelectronico.domain.repository.ProductoRepository
@@ -15,4 +17,10 @@ class AppContainer(context: Context) {
     ).build()
 
     val productoRepository: ProductoRepository = LocalProductoRepository(database.productoDao())
+
+    /** Servicios Firebase aislados de la fuente local de productos. */
+    val firebaseAuthManager: FirebaseAuthManager by lazy { FirebaseAuthManager() }
+    val firebaseConnectionVerifier: FirebaseConnectionVerifier by lazy {
+        FirebaseConnectionVerifier(firebaseAuthManager)
+    }
 }
