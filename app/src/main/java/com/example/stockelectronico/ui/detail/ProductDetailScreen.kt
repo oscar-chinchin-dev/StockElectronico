@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -15,6 +17,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -28,8 +33,11 @@ import com.example.stockelectronico.ui.inventory.formatClp
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
-fun ProductDetailScreen(viewModel: ProductDetailViewModel, onBack: () -> Unit) {
+fun ProductDetailScreen(viewModel: ProductDetailViewModel, onBack: () -> Unit, onEdit: (String) -> Unit, onDeleted: () -> Unit) {
     val state = viewModel.uiState.collectAsStateWithLifecycle().value
+    val deleteState = viewModel.deleteState.collectAsStateWithLifecycle().value
+    val showDeleteDialog = remember { mutableStateOf(false) }
+    LaunchedEffect(deleteState.succeeded) { if (deleteState.succeeded) onDeleted() }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -42,9 +50,21 @@ fun ProductDetailScreen(viewModel: ProductDetailViewModel, onBack: () -> Unit) {
             state.isLoading -> DetailMessage(R.string.loading, padding)
             state.hasError -> DetailMessage(R.string.product_detail_error, padding)
             state.producto == null -> DetailMessage(R.string.product_detail_not_found, padding)
-            else -> ProductDetail(state.producto, padding)
+            else -> ProductDetail(state.producto, padding, onEdit = { onEdit(state.producto.id) }, onDelete = { showDeleteDialog.value = true }, deleteError = deleteState.hasError)
         }
     }
+    if (showDeleteDialog.value) AlertDialog(
+        onDismissRequest = { if (!deleteState.isDeleting) showDeleteDialog.value = false },
+        title = { Text(stringResource(R.string.delete_product_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(stringResource(R.string.delete_product_message))
+                if (deleteState.hasError) Text(stringResource(R.string.delete_product_error), color = MaterialTheme.colorScheme.error)
+            }
+        },
+        confirmButton = { Button(onClick = viewModel::delete, enabled = !deleteState.isDeleting) { Text(stringResource(if (deleteState.isDeleting) R.string.deleting else R.string.delete)) } },
+        dismissButton = { TextButton(onClick = { showDeleteDialog.value = false }, enabled = !deleteState.isDeleting) { Text(stringResource(R.string.cancel)) } }
+    )
 }
 
 @Composable
@@ -57,7 +77,7 @@ private fun DetailMessage(message: Int, padding: androidx.compose.foundation.lay
 }
 
 @Composable
-private fun ProductDetail(producto: Producto, padding: androidx.compose.foundation.layout.PaddingValues) {
+private fun ProductDetail(producto: Producto, padding: androidx.compose.foundation.layout.PaddingValues, onEdit: () -> Unit, onDelete: () -> Unit, deleteError: Boolean) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -75,6 +95,9 @@ private fun ProductDetail(producto: Producto, padding: androidx.compose.foundati
                 DetailField(R.string.product_detail_price, formatClp(producto.precio))
                 DetailField(R.string.product_detail_stock, producto.stock.toString())
                 DetailField(R.string.product_detail_channel, channelName(producto.canal))
+                Button(onClick = onEdit, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.edit_product)) }
+                TextButton(onClick = onDelete, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.delete)) }
+                if (deleteError) Text(stringResource(R.string.delete_product_error), color = MaterialTheme.colorScheme.error)
             }
         }
     }

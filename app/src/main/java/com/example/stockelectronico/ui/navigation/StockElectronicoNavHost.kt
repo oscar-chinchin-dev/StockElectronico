@@ -15,10 +15,15 @@ import com.example.stockelectronico.ui.detail.ProductDetailViewModelFactory
 import com.example.stockelectronico.ui.inventory.InventoryScreen
 import com.example.stockelectronico.ui.inventory.InventoryViewModel
 import com.example.stockelectronico.ui.inventory.InventoryViewModelFactory
+import com.example.stockelectronico.ui.form.ProductFormScreen
+import com.example.stockelectronico.ui.form.ProductFormViewModel
+import com.example.stockelectronico.ui.form.ProductFormViewModelFactory
 
 private const val INVENTORY_ROUTE = "inventory"
 private const val DETAIL_ROUTE = "product_detail"
 private const val PRODUCT_ID_ARGUMENT = "productId"
+private const val CREATE_ROUTE = "product_create"
+private const val EDIT_ROUTE = "product_edit"
 
 @Composable
 fun StockElectronicoNavHost(productoRepository: ProductoRepository) {
@@ -32,9 +37,7 @@ fun StockElectronicoNavHost(productoRepository: ProductoRepository) {
             val viewModel: InventoryViewModel = viewModel(
                 factory = InventoryViewModelFactory(productoRepository)
             )
-            InventoryScreen(viewModel) { productId ->
-                navController.navigate("$DETAIL_ROUTE/${Uri.encode(productId)}")
-            }
+            InventoryScreen(viewModel, onProductSelected = { productId -> navController.navigate("$DETAIL_ROUTE/${Uri.encode(productId)}") }, onCreateProduct = { navController.navigate(CREATE_ROUTE) })
         }
         composable(
             route = "$DETAIL_ROUTE/{$PRODUCT_ID_ARGUMENT}",
@@ -48,7 +51,16 @@ fun StockElectronicoNavHost(productoRepository: ProductoRepository) {
                 key = productId,
                 factory = ProductDetailViewModelFactory(productId, productoRepository)
             )
-            ProductDetailScreen(viewModel, onBack = navController::popBackStack)
+            ProductDetailScreen(viewModel, onBack = navController::popBackStack, onEdit = { id -> navController.navigate("$EDIT_ROUTE/${Uri.encode(id)}") }, onDeleted = { navController.popBackStack(INVENTORY_ROUTE, false) })
+        }
+        composable(CREATE_ROUTE) {
+            val viewModel: ProductFormViewModel = viewModel(factory = ProductFormViewModelFactory(null, productoRepository))
+            ProductFormScreen(viewModel, onBack = navController::popBackStack, onSaved = { navController.popBackStack(INVENTORY_ROUTE, false) })
+        }
+        composable(route = "$EDIT_ROUTE/{$PRODUCT_ID_ARGUMENT}", arguments = listOf(navArgument(PRODUCT_ID_ARGUMENT) { type = NavType.StringType })) { entry ->
+            val productId = entry.arguments?.getString(PRODUCT_ID_ARGUMENT)?.let { runCatching { Uri.decode(it) }.getOrNull() }.orEmpty()
+            val viewModel: ProductFormViewModel = viewModel(key = "edit-$productId", factory = ProductFormViewModelFactory(productId, productoRepository))
+            ProductFormScreen(viewModel, onBack = navController::popBackStack, onSaved = { navController.popBackStack() })
         }
     }
 }

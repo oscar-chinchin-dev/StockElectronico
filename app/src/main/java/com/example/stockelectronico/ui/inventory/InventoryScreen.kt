@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -30,9 +31,12 @@ import java.util.Locale
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
-fun InventoryScreen(viewModel: InventoryViewModel, onProductSelected: (String) -> Unit) {
+fun InventoryScreen(viewModel: InventoryViewModel, onProductSelected: (String) -> Unit, onCreateProduct: () -> Unit) {
     val state = viewModel.uiState.collectAsStateWithLifecycle().value
-    Scaffold(topBar = { TopAppBar(title = { Text(stringResource(R.string.inventory_title)) }) }) { padding ->
+    Scaffold(
+        topBar = { TopAppBar(title = { Text(stringResource(R.string.inventory_title)) }) },
+        floatingActionButton = { FloatingActionButton(onClick = onCreateProduct) { Text(stringResource(R.string.create_product_short)) } }
+    ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp)) {
             OutlinedTextField(
                 value = state.query,
