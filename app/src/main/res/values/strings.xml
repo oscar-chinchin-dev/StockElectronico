@@ -1,3 +1,5 @@
 <resources>
-    <string name="app_name">StockElectronico</string>
+    <string name="app_name">Stock Electrónico</string>
+    <string name="base_screen_title">Stock Electrónico</string>
+    <string name="base_screen_message">Proyecto base</string>
 </resources>
