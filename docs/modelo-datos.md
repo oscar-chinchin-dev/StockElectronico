@@ -12,7 +12,7 @@ Los campos siguientes pertenecen al producto. Todos, excepto `syncStatus`, se co
 
 | Campo | Tipo Kotlin conceptual | SQLite futuro | Firestore futuro | Reglas y semántica |
 | --- | --- | --- | --- | --- |
-| `id` | `String` | `TEXT PRIMARY KEY` | campo `id`; ID del documento | UUID generado por la aplicación, obligatorio, único e inmutable. `productos/{id}` debe tener el mismo valor. |
+| `id` | `String` | `TEXT PRIMARY KEY` | ID del documento | UUID generado por la aplicación, obligatorio, único e inmutable. `productos/{id}` debe tener el mismo valor. No se duplica como campo. |
 | `nombre` | `String` | `TEXT` | `String` | Obligatorio y no vacío. |
 | `codigo` | `String` | `TEXT` | `String` | SKU o código del producto; obligatorio y no vacío. La unicidad no se valida todavía. |
 | `categoria` | `String` | `TEXT` | `String` | Obligatoria y no vacía. |
@@ -58,9 +58,9 @@ No se definen aún anotaciones de Room, restricciones SQL, índices, consultas, 
 
 - Colección: `productos`.
 - Ruta de cada documento: `productos/{id}`.
-- ID de documento: el mismo UUID almacenado en el campo `id`.
+- ID de documento: el mismo UUID del producto; no se duplica como campo `id`.
 
-Cada documento incluirá: `id`, `nombre`, `codigo`, `categoria`, `marca`, `descripcion`, `precio`, `stock`, `canal`, `createdAt` y `updatedAt`.
+Cada documento incluirá: `nombre`, `codigo`, `categoria`, `marca`, `descripcion`, `precio`, `stock`, `canal`, `createdAt` y `updatedAt`.
 
 Firestore no incluirá `syncStatus`. La capa remota podrá decidir su tipo técnico exacto para los timestamps al implementarse, pero debe preservar su semántica y la capacidad de comparar `updatedAt`.
 
@@ -113,7 +113,6 @@ classDiagram
 
     class ProductosFirestore {
         +documentId = id
-        +id
         +nombre
         +codigo
         +categoria
