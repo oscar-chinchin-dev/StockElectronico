@@ -5,6 +5,10 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.stockelectronico.domain.model.Producto
 import com.example.stockelectronico.domain.repository.ProductoRepository
+import com.example.stockelectronico.data.sync.ProductoSyncLocalDataSource
+import com.example.stockelectronico.data.sync.ProductoSyncManager
+import com.example.stockelectronico.data.sync.ProductoSyncState
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -19,16 +23,21 @@ data class InventoryUiState(
     val isLoading: Boolean = true,
     val query: String = "",
     val productos: List<Producto> = emptyList(),
-    val hasError: Boolean = false
+    val hasError: Boolean = false,
+    val pendingCount: Int = 0,
+    val isSyncing: Boolean = false,
+    val syncFailed: Boolean = false
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class InventoryViewModel(
-    private val productoRepository: ProductoRepository
+    private val productoRepository: ProductoRepository,
+    private val syncManager: ProductoSyncManager? = null,
+    private val syncLocal: ProductoSyncLocalDataSource? = null
 ) : ViewModel() {
     private val query = MutableStateFlow("")
 
-    val uiState: StateFlow<InventoryUiState> = query
+    private val inventoryState: StateFlow<InventoryUiState> = query
         .flatMapLatest { texto ->
             val productos = if (texto.isBlank()) {
                 productoRepository.observarProductosActivos()
@@ -40,17 +49,33 @@ class InventoryViewModel(
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), InventoryUiState())
 
+    val uiState: StateFlow<InventoryUiState> = kotlinx.coroutines.flow.combine(
+        inventoryState,
+        syncLocal?.observePendingCount() ?: kotlinx.coroutines.flow.flowOf(0),
+        syncManager?.state ?: kotlinx.coroutines.flow.flowOf(ProductoSyncState.Idle)
+    ) { inventory, pendingCount, syncState ->
+        inventory.copy(
+            pendingCount = pendingCount,
+            isSyncing = syncState is ProductoSyncState.Syncing,
+            syncFailed = (syncState as? ProductoSyncState.Completed)?.result?.failed?.let { it > 0 } == true
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), InventoryUiState())
+
     fun onQueryChanged(value: String) {
         query.update { value }
     }
+
+    fun synchronize() { syncManager?.let { manager -> viewModelScope.launch { manager.synchronize() } } }
 }
 
 class InventoryViewModelFactory(
-    private val productoRepository: ProductoRepository
+    private val productoRepository: ProductoRepository,
+    private val syncManager: ProductoSyncManager? = null,
+    private val syncLocal: ProductoSyncLocalDataSource? = null
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         require(modelClass.isAssignableFrom(InventoryViewModel::class.java))
-        return InventoryViewModel(productoRepository) as T
+        return InventoryViewModel(productoRepository, syncManager, syncLocal) as T
     }
 }

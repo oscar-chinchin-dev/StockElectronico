@@ -16,6 +16,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -34,10 +35,18 @@ import java.util.Locale
 fun InventoryScreen(viewModel: InventoryViewModel, onProductSelected: (String) -> Unit, onCreateProduct: () -> Unit) {
     val state = viewModel.uiState.collectAsStateWithLifecycle().value
     Scaffold(
-        topBar = { TopAppBar(title = { Text(stringResource(R.string.inventory_title)) }) },
+        topBar = { TopAppBar(title = { Text(stringResource(R.string.inventory_title)) }, actions = {
+            TextButton(onClick = viewModel::synchronize) { Text(stringResource(R.string.sync_action)) }
+        }) },
         floatingActionButton = { FloatingActionButton(onClick = onCreateProduct) { Text(stringResource(R.string.create_product_short)) } }
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp)) {
+            when {
+                state.isSyncing -> Text(stringResource(R.string.sync_in_progress))
+                state.pendingCount > 0 -> Text(stringResource(R.string.sync_pending, state.pendingCount))
+                state.syncFailed -> Text(stringResource(R.string.sync_error))
+                else -> Text(stringResource(R.string.sync_complete))
+            }
             OutlinedTextField(
                 value = state.query,
                 onValueChange = viewModel::onQueryChanged,

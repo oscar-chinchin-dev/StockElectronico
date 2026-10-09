@@ -92,6 +92,29 @@ class ProductoRoomTest {
         assertNull(repository.obtenerProductoActivoPorId(creado.id))
     }
 
+    @Test
+    fun transicionesDeSyncSonCondicionalesYElConteoIncluyeBajasPendientes() = runBlocking(Dispatchers.IO) {
+        val creado = repository.crearProducto(productoBase())
+        val dao = database.productoDao()
+
+        assertEquals(1, dao.marcarComoSincronizadoSiCoincide(creado.id, creado.updatedAt))
+        assertEquals(0, dao.marcarComoSincronizadoSiCoincide(creado.id, creado.updatedAt))
+        assertEquals(0, dao.observarCantidadPendientes().first())
+
+        clock += 1
+        repository.actualizarProducto(creado.copy(nombre = "Nueva versión"))
+        assertEquals(0, dao.marcarComoSincronizadoSiCoincide(creado.id, creado.updatedAt))
+        assertEquals(1, dao.observarCantidadPendientes().first())
+
+        clock += 1
+        repository.marcarEliminacionPendiente(creado.id)
+        val tombstone = dao.obtenerPendientesDeSincronizacion().single()
+        assertEquals(1, dao.observarCantidadPendientes().first())
+        assertEquals(0, dao.eliminarFisicamenteSiEliminacionPendienteCoincide(creado.id, tombstone.updatedAt - 1))
+        assertEquals(1, dao.eliminarFisicamenteSiEliminacionPendienteCoincide(creado.id, tombstone.updatedAt))
+        assertEquals(0, dao.observarCantidadPendientes().first())
+    }
+
     private fun productoBase() = Producto(
         id = "",
         nombre = "Teclado Mecánico",

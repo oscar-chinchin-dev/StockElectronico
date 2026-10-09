@@ -76,6 +76,19 @@ class FirestoreProductoDataSource(
         } catch (error: Exception) { error.toFailure() }
     }
 
+    override suspend fun upsert(producto: Producto): ProductoRemoteResult<Unit> {
+        val remote = when (val mapped = ProductoRemoteMapper.toRemote(producto)) {
+            is ProductoRemoteResult.Success -> mapped.value
+            is ProductoRemoteResult.Failure -> return mapped
+        }
+        authenticate()?.let { return it }
+        return try {
+            // Sin merge para reemplazar campos residuales y conservar el contrato canónico.
+            firestore.collection(PRODUCTOS_COLLECTION).document(producto.id).set(remote.toFirestoreMap()).await()
+            ProductoRemoteResult.Success(Unit)
+        } catch (error: Exception) { error.toFailure() }
+    }
+
     /** Firestore delete es idempotente: borrar un ID inexistente se considera exitoso. */
     override suspend fun delete(id: String): ProductoRemoteResult<Unit> {
         validateId(id)?.let { return it }

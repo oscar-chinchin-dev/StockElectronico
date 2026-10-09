@@ -74,7 +74,13 @@ Firestore no incluirá `syncStatus`. La capa remota podrá decidir su tipo técn
 | `PENDING` | Hay una creación o actualización local pendiente de subir. |
 | `PENDING_DELETE` | El producto deja de mostrarse normalmente, pero la eliminación remota está pendiente. |
 
-`PENDING_DELETE` anticipa un borrado lógico local durante la sincronización, sin exponer `syncStatus` como un campo remoto. La máquina de estados, los trabajos de subida/bajada y el borrado remoto se implementarán en etapas posteriores.
+`PENDING_DELETE` es un borrado lógico local durante la sincronización, sin exponer `syncStatus` como un campo remoto.
+
+## Subida Room → Firestore
+
+Room continúa siendo la fuente de verdad. La subida procesa primero los registros `PENDING`: realiza un upsert canónico en `productos/{id}` y, sólo tras el éxito remoto, cambia a `SYNCED`. Los `PENDING_DELETE` realizan un `delete` remoto idempotente y, sólo tras éxito, se eliminan físicamente de Room. Ante cualquier fallo remoto, el estado pendiente se conserva.
+
+Ambas transiciones locales comprueban `id`, estado y `updatedAt` de la versión subida. Si el usuario modificó el producto durante la operación, la actualización condicional afecta cero filas y la versión nueva queda pendiente para una pasada posterior. Esta etapa no implementa descarga ni resolución de conflictos.
 
 ## Diagrama
 

@@ -9,6 +9,11 @@
     <string name="loading">Cargando…</string>
     <string name="inventory_stock">Stock: %1$d</string>
     <string name="inventory_code">Código: %1$s</string>
+    <string name="sync_action">Sincronizar</string>
+    <string name="sync_complete">Todo sincronizado</string>
+    <string name="sync_pending">Sincronización pendiente: %1$d</string>
+    <string name="sync_in_progress">Sincronizando…</string>
+    <string name="sync_error">No se pudieron sincronizar algunos cambios.</string>
     <string name="product_detail_title">Detalle del producto</string>
     <string name="product_detail_not_found">El producto ya no está disponible.</string>
     <string name="product_detail_error">No fue posible cargar el producto. Inténtalo nuevamente.</string>

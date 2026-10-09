@@ -9,6 +9,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.stockelectronico.domain.repository.ProductoRepository
+import com.example.stockelectronico.data.sync.ProductoSyncLocalDataSource
+import com.example.stockelectronico.data.sync.ProductoSyncManager
 import com.example.stockelectronico.ui.detail.ProductDetailScreen
 import com.example.stockelectronico.ui.detail.ProductDetailViewModel
 import com.example.stockelectronico.ui.detail.ProductDetailViewModelFactory
@@ -26,7 +28,11 @@ private const val CREATE_ROUTE = "product_create"
 private const val EDIT_ROUTE = "product_edit"
 
 @Composable
-fun StockElectronicoNavHost(productoRepository: ProductoRepository) {
+fun StockElectronicoNavHost(
+    productoRepository: ProductoRepository,
+    productoSyncManager: ProductoSyncManager,
+    productoSyncLocalDataSource: ProductoSyncLocalDataSource
+) {
     val navController = rememberNavController()
 
     NavHost(
@@ -35,7 +41,7 @@ fun StockElectronicoNavHost(productoRepository: ProductoRepository) {
     ) {
         composable(INVENTORY_ROUTE) {
             val viewModel: InventoryViewModel = viewModel(
-                factory = InventoryViewModelFactory(productoRepository)
+                factory = InventoryViewModelFactory(productoRepository, productoSyncManager, productoSyncLocalDataSource)
             )
             InventoryScreen(viewModel, onProductSelected = { productId -> navController.navigate("$DETAIL_ROUTE/${Uri.encode(productId)}") }, onCreateProduct = { navController.navigate(CREATE_ROUTE) })
         }

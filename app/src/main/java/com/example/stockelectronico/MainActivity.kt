@@ -19,7 +19,11 @@ class MainActivity : ComponentActivity() {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     StockElectronicoNavHost(
                         productoRepository = (application as StockElectronicoApplication)
-                            .appContainer.productoRepository
+                            .appContainer.productoRepository,
+                        productoSyncManager = (application as StockElectronicoApplication)
+                            .appContainer.productoSyncManager,
+                        productoSyncLocalDataSource = (application as StockElectronicoApplication)
+                            .appContainer.productoSyncLocalDataSource
                     )
                 }
             }
