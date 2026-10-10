@@ -5,10 +5,14 @@ import com.google.firebase.auth.FirebaseAuthException
 import kotlinx.coroutines.tasks.await
 
 /** Obtiene una sesión anónima reutilizable sin exponer detalles de Firebase a la UI. */
+interface AuthenticationProvider {
+    suspend fun ensureAuthenticated(): AuthenticationResult
+}
+
 class FirebaseAuthManager(
     private val firebaseAuth: FirebaseAuth = FirebaseAuth.getInstance()
-) {
-    suspend fun ensureAuthenticated(): AuthenticationResult {
+) : AuthenticationProvider {
+    override suspend fun ensureAuthenticated(): AuthenticationResult {
         firebaseAuth.currentUser?.let { return AuthenticationResult.Authenticated(it.uid) }
 
         return try {

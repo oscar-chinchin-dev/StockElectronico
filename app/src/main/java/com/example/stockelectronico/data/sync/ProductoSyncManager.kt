@@ -3,7 +3,7 @@ package com.example.stockelectronico.data.sync
 import com.example.stockelectronico.data.local.mapper.toDomain
 import com.example.stockelectronico.data.remote.ProductoRemoteDataSource
 import com.example.stockelectronico.data.remote.ProductoRemoteError
-import com.example.stockelectronico.data.remote.ProductoRemoteResult
+import com.example.stockelectronico.data.remote.ProductoRemoteSyncResult
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -30,19 +30,23 @@ class ProductoSyncManager(
         var failed = 0
 
         local.pendingUploads().forEach { entity ->
-            when (retry { remote.upsert(entity.toDomain()) }) {
-                is ProductoRemoteResult.Success -> {
+            when (val remoteResult = retrySync { remote.syncUpsert(entity.toDomain()) }) {
+                ProductoRemoteSyncResult.Applied, ProductoRemoteSyncResult.AlreadyCurrent -> {
                     if (local.markSynced(entity.id, entity.updatedAt) == 1) uploaded++
                 }
-                is ProductoRemoteResult.Failure -> failed++
+                is ProductoRemoteSyncResult.RemoteNewer -> local.mergeRemote(remoteResult.producto)
+                is ProductoRemoteSyncResult.RemoteCanonical -> local.mergeRemote(remoteResult.producto)
+                is ProductoRemoteSyncResult.Failure -> failed++
             }
         }
         local.pendingDeletes().forEach { entity ->
-            when (retry { remote.delete(entity.id) }) {
-                is ProductoRemoteResult.Success -> {
+            when (val remoteResult = retrySync { remote.syncDelete(entity.toDomain()) }) {
+                ProductoRemoteSyncResult.Applied, ProductoRemoteSyncResult.AlreadyCurrent -> {
                     if (local.deleteIfStillPending(entity.id, entity.updatedAt) == 1) deleted++
                 }
-                is ProductoRemoteResult.Failure -> failed++
+                is ProductoRemoteSyncResult.RemoteNewer -> local.mergeRemote(remoteResult.producto)
+                is ProductoRemoteSyncResult.RemoteCanonical -> local.mergeRemote(remoteResult.producto)
+                is ProductoRemoteSyncResult.Failure -> failed++
             }
         }
 
@@ -51,7 +55,7 @@ class ProductoSyncManager(
         result
     }
 
-    private suspend fun retry(operation: suspend () -> ProductoRemoteResult<Unit>): ProductoRemoteResult<Unit> {
+    private suspend fun retrySync(operation: suspend () -> ProductoRemoteSyncResult): ProductoRemoteSyncResult {
         var result = operation()
         var attempt = 1
         while (attempt < maxAttempts && result.shouldRetry()) {
@@ -62,8 +66,8 @@ class ProductoSyncManager(
         return result
     }
 
-    private fun ProductoRemoteResult<Unit>.shouldRetry(): Boolean =
-        this is ProductoRemoteResult.Failure && error is ProductoRemoteError.Unavailable
+    private fun ProductoRemoteSyncResult.shouldRetry(): Boolean =
+        this is ProductoRemoteSyncResult.Failure && error is ProductoRemoteError.Unavailable
 
     companion object { const val DEFAULT_MAX_ATTEMPTS = 3 }
 }

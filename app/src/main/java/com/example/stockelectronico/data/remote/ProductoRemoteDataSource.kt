@@ -11,4 +11,16 @@ interface ProductoRemoteDataSource {
     /** Escritura canónica para la cola local: crea o reemplaza productos/{id}. */
     suspend fun upsert(producto: Producto): ProductoRemoteResult<Unit>
     suspend fun delete(id: String): ProductoRemoteResult<Unit>
+    /** Listener lifecycle is owned by the application-level realtime coordinator. */
+    fun observeProducts(listener: (ProductoRemoteEvent) -> Unit): ProductoRemoteListenerRegistration =
+        ProductoRemoteListenerRegistration { }
+    /** Defaults preserve small fakes and non-Firestore implementations; Firestore overrides atomically. */
+    suspend fun syncUpsert(producto: Producto): ProductoRemoteSyncResult = when (val result = upsert(producto)) {
+        is ProductoRemoteResult.Success -> ProductoRemoteSyncResult.Applied
+        is ProductoRemoteResult.Failure -> ProductoRemoteSyncResult.Failure(result.error)
+    }
+    suspend fun syncDelete(producto: Producto): ProductoRemoteSyncResult = when (val result = delete(producto.id)) {
+        is ProductoRemoteResult.Success -> ProductoRemoteSyncResult.Applied
+        is ProductoRemoteResult.Failure -> ProductoRemoteSyncResult.Failure(result.error)
+    }
 }

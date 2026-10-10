@@ -12,6 +12,7 @@ import com.example.stockelectronico.data.repository.SyncingProductoRepository
 import com.example.stockelectronico.data.sync.ProductoSyncLocalDataSource
 import com.example.stockelectronico.data.sync.ProductoSyncManager
 import com.example.stockelectronico.data.sync.RoomProductoSyncLocalDataSource
+import com.example.stockelectronico.data.sync.ProductoRealtimeSyncManager
 import com.example.stockelectronico.domain.repository.ProductoRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -41,8 +42,14 @@ class AppContainer(context: Context) {
     val productoSyncManager: ProductoSyncManager by lazy {
         ProductoSyncManager(productoSyncLocalDataSource, productoRemoteDataSource)
     }
+    /** Único listener de aplicación: no pertenece a una pantalla ni a Compose. */
+    val productoRealtimeSyncManager: ProductoRealtimeSyncManager by lazy {
+        ProductoRealtimeSyncManager(firebaseAuthManager, productoRemoteDataSource, productoSyncLocalDataSource, applicationScope)
+    }
     /** Repository expuesto a UI: Room responde primero y la subida queda en segundo plano. */
     val productoRepository: ProductoRepository by lazy {
         SyncingProductoRepository(localProductoRepository, productoSyncManager, applicationScope)
     }
+
+    fun startRealtimeSync() = productoRealtimeSyncManager.start()
 }

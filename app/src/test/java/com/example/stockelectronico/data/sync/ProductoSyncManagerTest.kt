@@ -5,6 +5,7 @@ import com.example.stockelectronico.data.local.entity.SyncStatus
 import com.example.stockelectronico.data.remote.ProductoRemoteDataSource
 import com.example.stockelectronico.data.remote.ProductoRemoteError
 import com.example.stockelectronico.data.remote.ProductoRemoteResult
+import com.example.stockelectronico.data.remote.ProductoRemoteSyncResult
 import com.example.stockelectronico.domain.model.Canal
 import com.example.stockelectronico.domain.model.Producto
 import kotlinx.coroutines.flow.Flow
@@ -104,6 +105,45 @@ class ProductoSyncManagerTest {
         assertEquals(1, result.uploaded)
     }
 
+    @Test fun remoteNewerUploadAndDeleteAreMergedInsteadOfOverwritingRemote() = runBlocking {
+        val newer = Producto("a", "Remoto", "SKU", "Categoria", "Marca", "", 1, 1, Canal.AMBOS, 10, 200)
+        val uploadLocal = FakeLocal(uploads = mutableListOf(entity("a")))
+        manager(uploadLocal, FakeRemote(syncUpserts = ArrayDeque(listOf(ProductoRemoteSyncResult.RemoteNewer(newer))))).synchronize()
+        assertEquals(listOf(newer), uploadLocal.merged)
+        assertTrue(uploadLocal.synced.isEmpty())
+        val deleteLocal = FakeLocal(deletes = mutableListOf(entity("a", SyncStatus.PENDING_DELETE)))
+        manager(deleteLocal, FakeRemote(syncDeletes = ArrayDeque(listOf(ProductoRemoteSyncResult.RemoteNewer(newer))))).synchronize()
+        assertEquals(listOf(newer), deleteLocal.merged)
+        assertTrue(deleteLocal.deleted.isEmpty())
+    }
+
+    @Test fun equalTimestampWithDifferentPayloadMergesRemoteCanonicalPayload() = runBlocking {
+        val localProduct = Producto("a", "LOCAL", "SKU", "Categoria", "Marca", "", 1, 10, Canal.AMBOS, 10, 100)
+        val remoteProduct = localProduct.copy(nombre = "REMOTO", stock = 20)
+        val local = FakeLocal(uploads = mutableListOf(entity("a"))).also { it.roomProduct = localProduct }
+        val remote = CanonicalRemote(remoteProduct)
+
+        val result = ProductoSyncManager(local, remote, wait = {}).synchronize()
+
+        assertEquals(listOf(remoteProduct), local.merged)
+        assertEquals("Room must adopt the remote payload", remoteProduct, local.roomProduct)
+        assertTrue("LOCAL must not be marked SYNCED", local.synced.isEmpty())
+        assertEquals("Firestore payload must not be overwritten", remoteProduct, remote.firestoreProduct)
+        assertEquals(0, result.uploaded)
+    }
+
+    @Test fun equalTimestampWithSamePayloadStillMergesRemoteCanonicalPayload() = runBlocking {
+        val canonical = Producto("a", "IGUAL", "SKU", "Categoria", "Marca", "", 1, 10, Canal.AMBOS, 10, 100)
+        val local = FakeLocal(uploads = mutableListOf(entity("a").copy(nombre = "IGUAL")))
+        val remote = CanonicalRemote(canonical)
+
+        ProductoSyncManager(local, remote, wait = {}).synchronize()
+
+        assertEquals(listOf(canonical), local.merged)
+        assertTrue(local.synced.isEmpty())
+        assertEquals(0, remote.remoteWrites)
+    }
+
     private fun manager(local: FakeLocal, remote: FakeRemote, waits: MutableList<Long> = mutableListOf()) =
         ProductoSyncManager(local, remote, backoffMillis = { it.toLong() }, wait = { waits += it })
 
@@ -122,17 +162,25 @@ private class FakeLocal(
 ) : ProductoSyncLocalDataSource {
     val synced = mutableListOf<Pair<String, Long>>()
     val deleted = mutableListOf<Pair<String, Long>>()
+    val merged = mutableListOf<Producto>()
+    var roomProduct: Producto? = null
     override suspend fun pendingUploads() = uploads.toList()
     override suspend fun pendingDeletes() = deletes.toList()
     override suspend fun markSynced(id: String, updatedAt: Long): Int = markResult.also { if (it == 1) synced += id to updatedAt }
     override suspend fun deleteIfStillPending(id: String, updatedAt: Long): Int = deleteResult.also { if (it == 1) deleted += id to updatedAt }
     override suspend fun pendingCount(): Int = uploads.size + deletes.size - synced.size - deleted.size
     override fun observePendingCount(): Flow<Int> = MutableStateFlow(0)
+    override suspend fun mergeRemote(producto: Producto) = com.example.stockelectronico.data.local.dao.RemoteMergeResult.APPLIED.also {
+        merged += producto
+        roomProduct = producto
+    }
 }
 
 private class FakeRemote(
     private val upsertResults: ArrayDeque<ProductoRemoteResult<Unit>> = ArrayDeque(),
-    private val deleteResults: ArrayDeque<ProductoRemoteResult<Unit>> = ArrayDeque()
+    private val deleteResults: ArrayDeque<ProductoRemoteResult<Unit>> = ArrayDeque(),
+    private val syncUpserts: ArrayDeque<ProductoRemoteSyncResult> = ArrayDeque(),
+    private val syncDeletes: ArrayDeque<ProductoRemoteSyncResult> = ArrayDeque()
 ) : ProductoRemoteDataSource {
     var upsertCalls = 0
     var deleteCalls = 0
@@ -143,6 +191,8 @@ private class FakeRemote(
         ProductoRemoteResult.Failure(ProductoRemoteError.NotFound(id))
     override suspend fun getAll(): ProductoRemoteResult<List<Producto>> = ProductoRemoteResult.Success(emptyList())
     override suspend fun update(producto: Producto) = ProductoRemoteResult.Success(Unit)
+    override suspend fun syncUpsert(producto: Producto) = syncUpserts.removeFirstOrNull() ?: super.syncUpsert(producto)
+    override suspend fun syncDelete(producto: Producto) = syncDeletes.removeFirstOrNull() ?: super.syncDelete(producto)
 }
 
 private class MutablePendingLocal(private var pending: ProductoEntity?) : ProductoSyncLocalDataSource {
@@ -170,4 +220,19 @@ private class BlockingRemote : ProductoRemoteDataSource {
     override suspend fun getAll() = ProductoRemoteResult.Success(emptyList<Producto>())
     override suspend fun update(producto: Producto) = ProductoRemoteResult.Success(Unit)
     override suspend fun delete(id: String) = ProductoRemoteResult.Success(Unit)
+}
+
+private class CanonicalRemote(val firestoreProduct: Producto) : ProductoRemoteDataSource {
+    var remoteWrites = 0
+    override suspend fun syncUpsert(producto: Producto): ProductoRemoteSyncResult =
+        ProductoRemoteSyncResult.RemoteCanonical(firestoreProduct)
+    override suspend fun upsert(producto: Producto): ProductoRemoteResult<Unit> {
+        remoteWrites++
+        return ProductoRemoteResult.Success(Unit)
+    }
+    override suspend fun delete(id: String) = ProductoRemoteResult.Success(Unit)
+    override suspend fun create(producto: Producto) = ProductoRemoteResult.Success(Unit)
+    override suspend fun getById(id: String): ProductoRemoteResult<Producto> = ProductoRemoteResult.Success(firestoreProduct)
+    override suspend fun getAll() = ProductoRemoteResult.Success(listOf(firestoreProduct))
+    override suspend fun update(producto: Producto) = ProductoRemoteResult.Success(Unit)
 }

@@ -16,6 +16,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class FirestoreProductoDataSourceInstrumentedTest {
     @Test fun remoteCrudCompletesAndCleansUp() = runBlocking {
+        if (InstrumentationRegistry.getArguments().getString("etapa7Firebase") != "true") return@runBlocking
         val source = source()
         source.delete(PRODUCT_ID)
         try {

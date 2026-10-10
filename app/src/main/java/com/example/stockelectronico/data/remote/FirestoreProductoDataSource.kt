@@ -7,6 +7,7 @@ import com.example.stockelectronico.domain.model.Producto
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
 import com.google.firebase.firestore.Source
+import com.google.firebase.firestore.DocumentChange
 import kotlinx.coroutines.tasks.await
 
 /** Implementación Firestore explícita; sus operaciones no tienen efectos sobre Room. */
@@ -89,6 +90,85 @@ class FirestoreProductoDataSource(
         } catch (error: Exception) { error.toFailure() }
     }
 
+    override fun observeProducts(listener: (ProductoRemoteEvent) -> Unit): ProductoRemoteListenerRegistration {
+        val registration = firestore.collection(PRODUCTOS_COLLECTION).addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                listener(ProductoRemoteEvent.Error(error.toFailure().error))
+                return@addSnapshotListener
+            }
+            val changes = mutableListOf<ProductoRemoteChange>()
+            snapshot?.documentChanges?.forEach { change ->
+                when (change.type) {
+                    DocumentChange.Type.REMOVED -> changes += ProductoRemoteChange.Removed(change.document.id)
+                    DocumentChange.Type.ADDED, DocumentChange.Type.MODIFIED -> when (
+                        val mapped = ProductoRemoteMapper.toProducto(change.document.id, change.document.data)
+                    ) {
+                        is ProductoRemoteResult.Success -> changes += ProductoRemoteChange.Upsert(mapped.value)
+                        is ProductoRemoteResult.Failure -> listener(ProductoRemoteEvent.Error(mapped.error))
+                    }
+                }
+            }
+            if (changes.isNotEmpty()) listener(ProductoRemoteEvent.Changes(changes))
+        }
+        return ProductoRemoteListenerRegistration { registration.remove() }
+    }
+
+    override suspend fun syncUpsert(producto: Producto): ProductoRemoteSyncResult {
+        val remote = when (val mapped = ProductoRemoteMapper.toRemote(producto)) {
+            is ProductoRemoteResult.Success -> mapped.value
+            is ProductoRemoteResult.Failure -> return ProductoRemoteSyncResult.Failure(mapped.error)
+        }
+        authenticate()?.let { return ProductoRemoteSyncResult.Failure(it.error) }
+        return try {
+            firestore.runTransaction { transaction ->
+                val reference = firestore.collection(PRODUCTOS_COLLECTION).document(producto.id)
+                val existing = transaction.get(reference)
+                if (!existing.exists()) {
+                    transaction.set(reference, remote.toFirestoreMap())
+                    ProductoRemoteSyncResult.Applied
+                } else when (val mapped = ProductoRemoteMapper.toProducto(existing.id, existing.data.orEmpty())) {
+                    is ProductoRemoteResult.Failure -> throw InvalidRemoteDocumentException(mapped.error)
+                    is ProductoRemoteResult.Success -> when {
+                        producto.updatedAt > mapped.value.updatedAt -> {
+                            transaction.set(reference, remote.toFirestoreMap())
+                            ProductoRemoteSyncResult.Applied
+                        }
+                        // The backend wins ties, including when every payload field happens to match.
+                        // Returning it prevents a local PENDING row from being falsely marked SYNCED.
+                        producto.updatedAt == mapped.value.updatedAt ->
+                            ProductoRemoteSyncResult.RemoteCanonical(mapped.value)
+                        else -> ProductoRemoteSyncResult.RemoteNewer(mapped.value)
+                    }
+                }
+            }.await()
+        } catch (error: InvalidRemoteDocumentException) {
+            ProductoRemoteSyncResult.Failure(error.remoteError)
+        } catch (error: Exception) { ProductoRemoteSyncResult.Failure(error.toFailure().error) }
+    }
+
+    override suspend fun syncDelete(producto: Producto): ProductoRemoteSyncResult {
+        validateId(producto.id)?.let { return ProductoRemoteSyncResult.Failure(it.error) }
+        authenticate()?.let { return ProductoRemoteSyncResult.Failure(it.error) }
+        return try {
+            firestore.runTransaction { transaction ->
+                val reference = firestore.collection(PRODUCTOS_COLLECTION).document(producto.id)
+                val existing = transaction.get(reference)
+                if (!existing.exists()) ProductoRemoteSyncResult.AlreadyCurrent
+                else when (val mapped = ProductoRemoteMapper.toProducto(existing.id, existing.data.orEmpty())) {
+                    is ProductoRemoteResult.Failure -> throw InvalidRemoteDocumentException(mapped.error)
+                    is ProductoRemoteResult.Success -> if (mapped.value.updatedAt > producto.updatedAt) {
+                        ProductoRemoteSyncResult.RemoteNewer(mapped.value)
+                    } else {
+                        transaction.delete(reference)
+                        ProductoRemoteSyncResult.Applied
+                    }
+                }
+            }.await()
+        } catch (error: InvalidRemoteDocumentException) {
+            ProductoRemoteSyncResult.Failure(error.remoteError)
+        } catch (error: Exception) { ProductoRemoteSyncResult.Failure(error.toFailure().error) }
+    }
+
     /** Firestore delete es idempotente: borrar un ID inexistente se considera exitoso. */
     override suspend fun delete(id: String): ProductoRemoteResult<Unit> {
         validateId(id)?.let { return it }
@@ -119,6 +199,7 @@ class FirestoreProductoDataSource(
 
     private class AlreadyExistsException(val documentId: String) : RuntimeException()
     private class NotFoundException(val documentId: String) : RuntimeException()
+    private class InvalidRemoteDocumentException(val remoteError: ProductoRemoteError) : RuntimeException()
 
     companion object { const val PRODUCTOS_COLLECTION = "productos" }
 }

@@ -6,6 +6,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
 import com.example.stockelectronico.data.local.entity.ProductoEntity
+import com.example.stockelectronico.data.local.entity.SyncStatus
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -40,6 +41,43 @@ interface ProductoDao {
     @Query("DELETE FROM productos WHERE id = :id")
     suspend fun eliminarFisicamentePorId(id: String): Int
 
+    @Query("SELECT * FROM productos WHERE id = :id LIMIT 1")
+    suspend fun obtenerPorIdIncluyendoEliminados(id: String): ProductoEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun guardarRemoto(producto: ProductoEntity)
+
+    /**
+     * Aplica un documento Firestore dentro de la misma transacción que decide el
+     * conflicto. Los empates son canónicos del backend, salvo un tombstone local.
+     */
+    @androidx.room.Transaction
+    suspend fun fusionarRemoto(remoto: ProductoEntity): RemoteMergeResult {
+        val local = obtenerPorIdIncluyendoEliminados(remoto.id)
+        if (local == null) {
+            guardarRemoto(remoto.copy(syncStatus = SyncStatus.SYNCED))
+            return RemoteMergeResult.APPLIED
+        }
+        if (local.syncStatus == SyncStatus.PENDING_DELETE && remoto.updatedAt <= local.updatedAt) {
+            return RemoteMergeResult.KEPT_LOCAL
+        }
+        if (remoto.updatedAt < local.updatedAt) return RemoteMergeResult.KEPT_LOCAL
+        guardarRemoto(remoto.copy(syncStatus = SyncStatus.SYNCED))
+        return RemoteMergeResult.APPLIED
+    }
+
+    /** REMOVED no tiene timestamp: sólo confirma una fila sincronizada o tombstone. */
+    @androidx.room.Transaction
+    suspend fun aplicarEliminacionRemota(id: String): RemoteMergeResult {
+        return when (obtenerPorIdIncluyendoEliminados(id)?.syncStatus) {
+            null, SyncStatus.PENDING -> RemoteMergeResult.KEPT_LOCAL
+            SyncStatus.SYNCED, SyncStatus.PENDING_DELETE -> {
+                eliminarFisicamentePorId(id)
+                RemoteMergeResult.DELETED
+            }
+        }
+    }
+
     @Query("SELECT * FROM productos WHERE syncStatus = 'PENDING' ORDER BY updatedAt ASC, id ASC")
     suspend fun obtenerPendientes(): List<ProductoEntity>
 
@@ -58,3 +96,5 @@ interface ProductoDao {
     @Query("SELECT COUNT(*) FROM productos WHERE syncStatus IN ('PENDING', 'PENDING_DELETE')")
     fun observarCantidadPendientes(): Flow<Int>
 }
+
+enum class RemoteMergeResult { APPLIED, DELETED, KEPT_LOCAL }

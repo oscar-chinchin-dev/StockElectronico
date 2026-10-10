@@ -2,9 +2,7 @@
 
 ## Propósito
 
-Este documento define el contrato de datos de `Producto` para Stock Electrónico. Es la fuente de decisión para implementar la persistencia local con Room en la etapa 3 y la representación remota con Cloud Firestore en una etapa posterior.
-
-La interfaz de usuario leerá los productos desde Room, que será la fuente de verdad local. Esta etapa es solo de modelado: no crea clases Kotlin, entidades, tablas reales ni integración con servicios remotos.
+Este documento define el contrato de datos de `Producto` para Stock Electrónico y la sincronización implementada en la etapa 9. La UI lee desde Room, que conserva la fuente de verdad local; Firestore es el backend de sincronización.
 
 ## Modelo y diccionario de datos
 
@@ -31,11 +29,11 @@ La aplicación generará un UUID antes de crear un producto. Se almacenará como
 
 `createdAt` registra el instante de creación y no describe una actualización posterior. `updatedAt` registra la última modificación conocida. Ambos se expresan como tiempo Unix en milisegundos para conservar una comparación consistente entre almacenamiento local y remoto.
 
-La futura resolución de conflictos seguirá la regla **gana el `updatedAt` más reciente**. Esta regla no implementa todavía ningún algoritmo de sincronización.
+La resolución de conflictos implementada usa **gana el `updatedAt` más reciente** con las reglas de empate descritas en la sección de etapa 9.
 
-## Representación futura en Room/SQLite
+## Representación en Room/SQLite
 
-La futura tabla local se llamará `productos` y tendrá este esquema conceptual:
+La tabla local se llama `productos` y tiene este esquema conceptual:
 
 | Columna | Tipo SQLite conceptual | Observación |
 | --- | --- | --- |
@@ -54,7 +52,7 @@ La futura tabla local se llamará `productos` y tendrá este esquema conceptual:
 
 No se definen aún anotaciones de Room, restricciones SQL, índices, consultas, convertidores, migraciones ni DAO.
 
-## Representación futura en Cloud Firestore
+## Representación en Cloud Firestore
 
 - Colección: `productos`.
 - Ruta de cada documento: `productos/{id}`.
@@ -64,11 +62,11 @@ Cada documento incluirá: `nombre`, `codigo`, `categoria`, `marca`, `descripcion
 
 Firestore no incluirá `syncStatus`. La capa remota podrá decidir su tipo técnico exacto para los timestamps al implementarse, pero debe preservar su semántica y la capacidad de comparar `updatedAt`.
 
-## Campos exclusivos locales y sincronización futura
+## Campos exclusivos locales y sincronización
 
 `syncStatus` existe solamente en Room. Sus valores conceptuales son:
 
-| Valor | Significado futuro |
+| Valor | Significado |
 | --- | --- |
 | `SYNCED` | El estado local conocido está sincronizado con Firestore. |
 | `PENDING` | Hay una creación o actualización local pendiente de subir. |
@@ -80,7 +78,17 @@ Firestore no incluirá `syncStatus`. La capa remota podrá decidir su tipo técn
 
 Room continúa siendo la fuente de verdad. La subida procesa primero los registros `PENDING`: realiza un upsert canónico en `productos/{id}` y, sólo tras el éxito remoto, cambia a `SYNCED`. Los `PENDING_DELETE` realizan un `delete` remoto idempotente y, sólo tras éxito, se eliminan físicamente de Room. Ante cualquier fallo remoto, el estado pendiente se conserva.
 
-Ambas transiciones locales comprueban `id`, estado y `updatedAt` de la versión subida. Si el usuario modificó el producto durante la operación, la actualización condicional afecta cero filas y la versión nueva queda pendiente para una pasada posterior. Esta etapa no implementa descarga ni resolución de conflictos.
+Ambas transiciones locales comprueban `id`, estado y `updatedAt` de la versión subida. Si el usuario modificó el producto durante la operación, la actualización condicional afecta cero filas y la versión nueva queda pendiente para una pasada posterior.
+
+## Sincronización bidireccional y tiempo real (etapa 9)
+
+Room sigue siendo la única fuente de verdad para la UI. El proceso mantiene una única suscripción de aplicación a `productos`: Firestore traduce `ADDED` y `MODIFIED` a upserts, y `REMOVED` a una eliminación remota; el coordinador serializa estos eventos y los fusiona en una transacción Room. Ninguna pantalla ni ViewModel consulta Firestore para listar o detallar productos.
+
+La fusión usa **latest `updatedAt` wins**. Un remoto nuevo reemplaza una fila `SYNCED` o `PENDING`; uno viejo conserva la fila local. En empate el remoto es canónico y queda `SYNCED`, excepto `PENDING_DELETE`: si el remoto tiene tiempo menor o igual, se conserva el tombstone local para evitar resucitar una eliminación. Un `REMOVED` borra físicamente sólo una fila `SYNCED` o `PENDING_DELETE`; conserva `PENDING` y no hace nada si no existe.
+
+Las descargas siempre se guardan como `SYNCED`, por lo que no producen un ciclo de subida. Errores de listener o documentos inválidos se exponen como estado controlado y nunca limpian Room. Al reconectar, el listener vuelve a entregar cambios y la cola local conserva sus pendientes.
+
+La subida y el borrado de la cola son transacciones Firestore conscientes de conflicto. Antes de escribir o borrar leen el documento remoto: si éste tiene un `updatedAt` mayor devuelven `RemoteNewer` y no lo pisan/borran; la versión remota se fusiona en Room. Para `SYNCED` y `PENDING`, un `updatedAt` igual devuelve `RemoteCanonical`: Room debe fusionar el payload remoto, incluso si parece igual, y jamás marca el payload local como `SYNCED` sin esa reconciliación. Para `PENDING_DELETE`, un empate conserva el tombstone local y no aplica la regla de remoto canónico. Esto permite que las carreras upload/listener y delete/listener converjan sin crear `PENDING` nuevos.
 
 ## Diagrama
 
@@ -137,4 +145,4 @@ classDiagram
 
 ## Alcance de esta etapa
 
-Esta documentación no materializa `Producto.kt`, Room, Firebase, Firestore, CRUD, repositorios, ViewModels ni sincronización. La etapa siguiente podrá crear las estructuras Room a partir de este contrato sin volver a definir campos, tipos ni reglas fundamentales.
+La etapa 9 implementa Room → Firestore, Firestore → Room, sincronización en tiempo real, resolución de conflictos y la continuidad de la cola local ante offline/reconexión. No declara completas las etapas 10 u 11.

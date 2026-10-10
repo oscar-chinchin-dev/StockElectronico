@@ -5,6 +5,8 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.example.stockelectronico.data.local.database.StockElectronicoDatabase
 import com.example.stockelectronico.data.local.entity.SyncStatus
+import com.example.stockelectronico.data.local.entity.ProductoEntity
+import com.example.stockelectronico.data.local.dao.RemoteMergeResult
 import com.example.stockelectronico.data.repository.LocalProductoRepository
 import com.example.stockelectronico.domain.model.Canal
 import com.example.stockelectronico.domain.model.Producto
@@ -114,6 +116,83 @@ class ProductoRoomTest {
         assertEquals(1, dao.eliminarFisicamenteSiEliminacionPendienteCoincide(creado.id, tombstone.updatedAt))
         assertEquals(0, dao.observarCantidadPendientes().first())
     }
+
+    @Test
+    fun mergeRemotoRespetaPendingYLaEliminacionPendiente() = runBlocking(Dispatchers.IO) {
+        val dao = database.productoDao()
+        dao.insertar(entity("p", 200, SyncStatus.PENDING))
+        assertEquals(RemoteMergeResult.KEPT_LOCAL, dao.fusionarRemoto(entity("p", 100, SyncStatus.SYNCED)))
+        assertEquals(200, dao.obtenerPorIdIncluyendoEliminados("p")!!.updatedAt)
+        assertEquals(RemoteMergeResult.APPLIED, dao.fusionarRemoto(entity("p", 300, SyncStatus.SYNCED)))
+        assertEquals(SyncStatus.SYNCED, dao.obtenerPorIdIncluyendoEliminados("p")!!.syncStatus)
+        dao.insertar(entity("d", 200, SyncStatus.PENDING_DELETE))
+        assertEquals(RemoteMergeResult.KEPT_LOCAL, dao.fusionarRemoto(entity("d", 200, SyncStatus.SYNCED)))
+        assertEquals(RemoteMergeResult.APPLIED, dao.fusionarRemoto(entity("d", 300, SyncStatus.SYNCED)))
+        assertEquals(SyncStatus.SYNCED, dao.obtenerPorIdIncluyendoEliminados("d")!!.syncStatus)
+    }
+
+    @Test
+    fun removedRemotoNoBorraPendingPeroConfirmaSyncedYTombstone() = runBlocking(Dispatchers.IO) {
+        val dao = database.productoDao()
+        dao.insertar(entity("pending", 100, SyncStatus.PENDING))
+        dao.insertar(entity("synced", 100, SyncStatus.SYNCED))
+        dao.insertar(entity("deleted", 100, SyncStatus.PENDING_DELETE))
+        assertEquals(RemoteMergeResult.KEPT_LOCAL, dao.aplicarEliminacionRemota("pending"))
+        assertEquals(RemoteMergeResult.DELETED, dao.aplicarEliminacionRemota("synced"))
+        assertEquals(RemoteMergeResult.DELETED, dao.aplicarEliminacionRemota("deleted"))
+        assertTrue(dao.obtenerPorIdIncluyendoEliminados("pending") != null)
+        assertNull(dao.obtenerPorIdIncluyendoEliminados("synced"))
+        assertNull(dao.obtenerPorIdIncluyendoEliminados("deleted"))
+    }
+
+    @Test
+    fun matrizCompletaUpsertRemotoIncluyeEmpatesCanonicos() = runBlocking(Dispatchers.IO) {
+        val dao = database.productoDao()
+        // Sin local; SYNCED: nuevo, igual y antiguo.
+        assertEquals(RemoteMergeResult.APPLIED, dao.fusionarRemoto(entity("none", 10, SyncStatus.SYNCED)))
+        dao.insertar(entity("syncedNew", 100, SyncStatus.SYNCED)); dao.fusionarRemoto(entity("syncedNew", 200, SyncStatus.SYNCED))
+        dao.insertar(entity("syncedEqual", 100, SyncStatus.SYNCED)); dao.fusionarRemoto(entity("syncedEqual", 100, SyncStatus.SYNCED).copy(nombre = "Canonico"))
+        dao.insertar(entity("syncedOld", 200, SyncStatus.SYNCED)); dao.fusionarRemoto(entity("syncedOld", 100, SyncStatus.SYNCED))
+        assertEquals(200, dao.obtenerPorIdIncluyendoEliminados("syncedNew")!!.updatedAt)
+        assertEquals("Canonico", dao.obtenerPorIdIncluyendoEliminados("syncedEqual")!!.nombre)
+        assertEquals(200, dao.obtenerPorIdIncluyendoEliminados("syncedOld")!!.updatedAt)
+        // PENDING: nuevo/igual ganan, antiguo queda pendiente.
+        dao.insertar(entity("pendingNew", 100, SyncStatus.PENDING)); dao.fusionarRemoto(entity("pendingNew", 200, SyncStatus.SYNCED))
+        dao.insertar(entity("pendingEqual", 100, SyncStatus.PENDING)); dao.fusionarRemoto(entity("pendingEqual", 100, SyncStatus.SYNCED).copy(nombre = "Canonico"))
+        dao.insertar(entity("pendingOld", 300, SyncStatus.PENDING)); dao.fusionarRemoto(entity("pendingOld", 200, SyncStatus.SYNCED))
+        assertEquals(SyncStatus.SYNCED, dao.obtenerPorIdIncluyendoEliminados("pendingNew")!!.syncStatus)
+        assertEquals("Canonico", dao.obtenerPorIdIncluyendoEliminados("pendingEqual")!!.nombre)
+        assertEquals(SyncStatus.PENDING, dao.obtenerPorIdIncluyendoEliminados("pendingOld")!!.syncStatus)
+        // PENDING_DELETE: sólo el remoto estrictamente nuevo restaura la fila.
+        dao.insertar(entity("deleteOld", 300, SyncStatus.PENDING_DELETE)); dao.fusionarRemoto(entity("deleteOld", 200, SyncStatus.SYNCED))
+        dao.insertar(entity("deleteEqual", 300, SyncStatus.PENDING_DELETE)); dao.fusionarRemoto(entity("deleteEqual", 300, SyncStatus.SYNCED))
+        dao.insertar(entity("deleteNew", 300, SyncStatus.PENDING_DELETE)); dao.fusionarRemoto(entity("deleteNew", 400, SyncStatus.SYNCED))
+        assertEquals(SyncStatus.PENDING_DELETE, dao.obtenerPorIdIncluyendoEliminados("deleteOld")!!.syncStatus)
+        assertEquals(SyncStatus.PENDING_DELETE, dao.obtenerPorIdIncluyendoEliminados("deleteEqual")!!.syncStatus)
+        assertEquals(SyncStatus.SYNCED, dao.obtenerPorIdIncluyendoEliminados("deleteNew")!!.syncStatus)
+    }
+
+    @Test
+    fun empateRemoteCanonicalReemplazaPayloadPendingEnRoom() = runBlocking(Dispatchers.IO) {
+        val dao = database.productoDao()
+        dao.insertar(entity("equal", 100, SyncStatus.PENDING).copy(nombre = "LOCAL", stock = 10))
+
+        assertEquals(
+            RemoteMergeResult.APPLIED,
+            dao.fusionarRemoto(entity("equal", 100, SyncStatus.SYNCED).copy(nombre = "REMOTO", stock = 20))
+        )
+
+        val stored = dao.obtenerPorIdIncluyendoEliminados("equal")!!
+        assertEquals("REMOTO", stored.nombre)
+        assertEquals(20, stored.stock)
+        assertEquals(100, stored.updatedAt)
+        assertEquals(SyncStatus.SYNCED, stored.syncStatus)
+    }
+
+    private fun entity(id: String, updatedAt: Long, status: SyncStatus) = ProductoEntity(
+        id, "Producto $id", "SKU-$id", "Categoria", "Marca", "", 1, 1,
+        Canal.AMBOS, 1, updatedAt, status
+    )
 
     private fun productoBase() = Producto(
         id = "",
