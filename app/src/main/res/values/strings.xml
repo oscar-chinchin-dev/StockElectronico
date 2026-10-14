@@ -3,6 +3,12 @@
     <string name="inventory_title">Inventario</string>
     <string name="inventory_search_label">Buscar productos</string>
     <string name="inventory_search_placeholder">Nombre o código SKU</string>
+    <string name="inventory_filter_category">Categoría</string>
+    <string name="inventory_filter_channel">Canal</string>
+    <string name="inventory_filter_supplier">Proveedor</string>
+    <string name="inventory_filter_all">Todos</string>
+    <string name="inventory_supplier">Proveedor: %1$s</string>
+    <string name="inventory_supplier_missing">Sin proveedor</string>
     <string name="inventory_empty">No hay productos registrados.</string>
     <string name="inventory_no_results">No se encontraron productos.</string>
     <string name="inventory_error">No fue posible cargar el inventario. Inténtalo nuevamente.</string>
@@ -37,6 +43,7 @@
     <string name="form_code">Código / SKU</string>
     <string name="form_category">Categoría</string>
     <string name="form_brand">Marca</string>
+    <string name="form_supplier">Proveedor</string>
     <string name="form_description">Descripción</string>
     <string name="form_price">Precio (CLP)</string>
     <string name="form_stock">Stock</string>
@@ -45,6 +52,7 @@
     <string name="form_error_code_required">El código es obligatorio.</string>
     <string name="form_error_category_required">La categoría es obligatoria.</string>
     <string name="form_error_brand_required">La marca es obligatoria.</string>
+    <string name="form_error_supplier_required">El proveedor es obligatorio.</string>
     <string name="form_error_price_invalid">Ingresa un precio válido.</string>
     <string name="form_error_price_negative">El precio no puede ser negativo.</string>
     <string name="form_error_stock_invalid">Ingresa un stock válido.</string>

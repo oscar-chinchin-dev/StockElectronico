@@ -23,6 +23,7 @@ data class ProductFormUiState(
     val codigo: String = "",
     val categoria: String = "",
     val marca: String = "",
+    val proveedor: String = "",
     val descripcion: String = "",
     val precio: String = "",
     val stock: String = "",
@@ -31,6 +32,7 @@ data class ProductFormUiState(
     val codigoError: Int? = null,
     val categoriaError: Int? = null,
     val marcaError: Int? = null,
+    val proveedorError: Int? = null,
     val precioError: Int? = null,
     val stockError: Int? = null
 )
@@ -52,6 +54,7 @@ class ProductFormViewModel(
     fun onCodigoChanged(value: String) = update { copy(codigo = value, codigoError = null) }
     fun onCategoriaChanged(value: String) = update { copy(categoria = value, categoriaError = null) }
     fun onMarcaChanged(value: String) = update { copy(marca = value, marcaError = null) }
+    fun onProveedorChanged(value: String) = update { copy(proveedor = value, proveedorError = null) }
     fun onDescripcionChanged(value: String) = update { copy(descripcion = value) }
     fun onPrecioChanged(value: String) = update { copy(precio = value, precioError = null) }
     fun onStockChanged(value: String) = update { copy(stock = value, stockError = null) }
@@ -76,6 +79,7 @@ class ProductFormViewModel(
                     codigo = current.codigo.trim(),
                     categoria = current.categoria.trim(),
                     marca = current.marca.trim(),
+                    proveedor = current.proveedor.trim(),
                     descripcion = current.descripcion.trim(),
                     precio = precio,
                     stock = stock,
@@ -107,6 +111,7 @@ class ProductFormViewModel(
                             codigo = product.codigo,
                             categoria = product.categoria,
                             marca = product.marca,
+                            proveedor = product.proveedor,
                             descripcion = product.descripcion,
                             precio = product.precio.toString(),
                             stock = product.stock.toString(),
@@ -126,10 +131,11 @@ class ProductFormViewModel(
             codigoError = if (state.codigo.isBlank()) com.example.stockelectronico.R.string.form_error_code_required else null,
             categoriaError = if (state.categoria.isBlank()) com.example.stockelectronico.R.string.form_error_category_required else null,
             marcaError = if (state.marca.isBlank()) com.example.stockelectronico.R.string.form_error_brand_required else null,
+            proveedorError = if (state.proveedor.isBlank()) com.example.stockelectronico.R.string.form_error_supplier_required else null,
             precioError = when { precio == null -> com.example.stockelectronico.R.string.form_error_price_invalid; precio < 0 -> com.example.stockelectronico.R.string.form_error_price_negative; else -> null },
             stockError = when { stock == null -> com.example.stockelectronico.R.string.form_error_stock_invalid; stock < 0 -> com.example.stockelectronico.R.string.form_error_stock_negative; else -> null }
         )
-        return result.takeIf { it.nombreError != null || it.codigoError != null || it.categoriaError != null || it.marcaError != null || it.precioError != null || it.stockError != null }
+        return result.takeIf { it.nombreError != null || it.codigoError != null || it.categoriaError != null || it.marcaError != null || it.proveedorError != null || it.precioError != null || it.stockError != null }
     }
 
     private fun update(transform: ProductFormUiState.() -> ProductFormUiState) = _uiState.update(transform)

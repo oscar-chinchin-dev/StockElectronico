@@ -62,6 +62,7 @@ private fun ProductForm(state: ProductFormUiState, viewModel: ProductFormViewMod
         FormField(state.codigo, viewModel::onCodigoChanged, R.string.form_code, state.codigoError)
         FormField(state.categoria, viewModel::onCategoriaChanged, R.string.form_category, state.categoriaError)
         FormField(state.marca, viewModel::onMarcaChanged, R.string.form_brand, state.marcaError)
+        FormField(state.proveedor, viewModel::onProveedorChanged, R.string.form_supplier, state.proveedorError)
         FormField(state.descripcion, viewModel::onDescripcionChanged, R.string.form_description, null, singleLine = false)
         FormField(state.precio, viewModel::onPrecioChanged, R.string.form_price, state.precioError, KeyboardType.Number)
         FormField(state.stock, viewModel::onStockChanged, R.string.form_stock, state.stockError, KeyboardType.Number)

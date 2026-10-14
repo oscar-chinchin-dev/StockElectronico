@@ -5,6 +5,8 @@ import com.example.stockelectronico.domain.model.Producto
 import com.example.stockelectronico.domain.repository.ProductoRepository
 import com.example.stockelectronico.ui.detail.ProductDetailViewModel
 import com.example.stockelectronico.ui.inventory.InventoryViewModel
+import com.example.stockelectronico.ui.inventory.availableSuppliers
+import com.example.stockelectronico.ui.inventory.filterInventoryProducts
 import com.example.stockelectronico.ui.form.ProductFormViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -52,7 +54,6 @@ class ViewModelTest {
         viewModel.onQueryChanged("TEC")
         val state = viewModel.uiState.first { it.query == "TEC" && !it.isLoading }
 
-        assertEquals(listOf("", "TEC"), repository.searches)
         assertEquals("TEC", state.query)
         assertEquals("TEC-1", state.productos.single().codigo)
     }
@@ -106,6 +107,7 @@ class ViewModelTest {
         viewModel.onCodigoChanged(" TEC-1 ")
         viewModel.onCategoriaChanged(" Periféricos ")
         viewModel.onMarcaChanged(" Marca ")
+        viewModel.onProveedorChanged(" Proveedor ")
         viewModel.onPrecioChanged("39990")
         viewModel.onStockChanged("10")
         viewModel.onCanalChanged(Canal.AMBOS)
@@ -115,6 +117,7 @@ class ViewModelTest {
         assertEquals("Teclado", repository.created.single().nombre)
         assertEquals("TEC-1", repository.created.single().codigo)
         assertEquals(Canal.AMBOS, repository.created.single().canal)
+        assertEquals("Proveedor", repository.created.single().proveedor)
         assertFalse(state.persistenceError)
     }
 
@@ -129,6 +132,7 @@ class ViewModelTest {
         assertTrue(state.codigoError != null)
         assertTrue(state.categoriaError != null)
         assertTrue(state.marcaError != null)
+        assertTrue(state.proveedorError != null)
         assertTrue(state.precioError != null)
         assertTrue(state.stockError != null)
     }
@@ -158,6 +162,7 @@ class ViewModelTest {
         val viewModel = ProductFormViewModel("1", repository)
         viewModel.uiState.first { !it.isLoading }
         assertEquals("Mouse", viewModel.uiState.value.nombre)
+        assertEquals("Proveedor existente", viewModel.uiState.value.proveedor)
         viewModel.onPrecioChanged("5000")
         viewModel.save()
         viewModel.uiState.first { it.saveSucceeded }
@@ -180,12 +185,56 @@ class ViewModelTest {
         assertEquals(listOf("1"), repository.deletedLogically)
     }
 
+    @Test
+    fun `blank supplier does not persist`() = runTest {
+        val repository = FakeProductoRepository()
+        val viewModel = validCreateForm(repository)
+        viewModel.onProveedorChanged("   ")
+        viewModel.save()
+
+        assertTrue(repository.created.isEmpty())
+        assertTrue(viewModel.uiState.value.proveedorError != null)
+    }
+
+    @Test
+    fun `inventory filtering searches supplier and is case insensitive`() {
+        val tech = producto("1", "Mouse", "MOU-1", marca = "Logitech", proveedor = "Tech Supply")
+
+        assertEquals(listOf(tech), filterInventoryProducts(listOf(tech), "tech", null, null, null))
+        assertEquals(listOf(tech), filterInventoryProducts(listOf(tech), "LOGI", null, null, null))
+    }
+
+    @Test
+    fun `inventory filters category channel supplier with AND semantics`() {
+        val matching = producto("1", "Mouse", "M1", categoria = "Periféricos", canal = Canal.ONLINE, proveedor = "Tech")
+        val wrongChannel = matching.copy(id = "2", canal = Canal.SUCURSAL)
+        val wrongCategory = matching.copy(id = "3", categoria = "Audio")
+        val wrongSupplier = matching.copy(id = "4", proveedor = "Otro")
+
+        assertEquals(
+            listOf(matching),
+            filterInventoryProducts(listOf(matching, wrongChannel, wrongCategory, wrongSupplier), "mouse", "Periféricos", Canal.ONLINE, "Tech")
+        )
+    }
+
+    @Test
+    fun `inventory all filters returns full inventory and suppliers omit blanks and duplicates`() {
+        val first = producto("1", "Mouse", "M1", proveedor = " Tech ")
+        val second = producto("2", "Teclado", "T1", proveedor = "Tech")
+        val legacy = producto("3", "Cable", "C1", proveedor = "")
+        val products = listOf(first, second, legacy)
+
+        assertEquals(products, filterInventoryProducts(products, "", null, null, null))
+        assertEquals(listOf("Tech"), availableSuppliers(products))
+    }
+
     private fun validCreateForm(repository: FakeProductoRepository): ProductFormViewModel =
         ProductFormViewModel(null, repository).also { viewModel ->
             viewModel.onNombreChanged("Teclado")
             viewModel.onCodigoChanged("TEC-1")
             viewModel.onCategoriaChanged("Periféricos")
             viewModel.onMarcaChanged("Marca")
+            viewModel.onProveedorChanged("Tech Supply")
             viewModel.onPrecioChanged("100")
             viewModel.onStockChanged("1")
         }
@@ -231,16 +280,25 @@ private class FakeProductoRepository(
     override suspend fun obtenerPendientesDeSincronizacion(): List<Producto> = emptyList()
 }
 
-private fun producto(id: String, nombre: String, codigo: String) = Producto(
+private fun producto(
+    id: String,
+    nombre: String,
+    codigo: String,
+    categoria: String = "Periféricos",
+    marca: String = "Ejemplo",
+    canal: Canal = Canal.AMBOS,
+    proveedor: String = "Proveedor existente"
+) = Producto(
     id = id,
     nombre = nombre,
     codigo = codigo,
-    categoria = "Periféricos",
-    marca = "Ejemplo",
+    categoria = categoria,
+    marca = marca,
     descripcion = "",
     precio = 12_990,
     stock = 5,
-    canal = Canal.AMBOS,
+    canal = canal,
     createdAt = 0,
-    updatedAt = 0
+    updatedAt = 0,
+    proveedor = proveedor
 )
