@@ -22,13 +22,15 @@ class FirestoreProductoDataSourceInstrumentedTest {
         try {
             assertSuccess(source.create(producto()))
             assertEquals(PRODUCT_ID, assertSuccess(source.getById(PRODUCT_ID)).id)
+            assertEquals("Proveedor Etapa 13", assertSuccess(source.getById(PRODUCT_ID)).proveedor)
             assertTrue(assertSuccess(source.getAll()).any { it.id == PRODUCT_ID })
 
-            assertSuccess(source.update(producto(precio = 12_990, stock = 8, descripcion = UPDATED_DESCRIPTION, updatedAt = UPDATED_AT)))
+            assertSuccess(source.update(producto(precio = 12_990, stock = 8, descripcion = UPDATED_DESCRIPTION, updatedAt = UPDATED_AT, proveedor = UPDATED_PROVIDER)))
             val updated = assertSuccess(source.getById(PRODUCT_ID))
             assertEquals(12_990, updated.precio)
             assertEquals(8, updated.stock)
             assertEquals(UPDATED_DESCRIPTION, updated.descripcion)
+            assertEquals(UPDATED_PROVIDER, updated.proveedor)
             assertEquals(CREATED_AT, updated.createdAt)
             assertEquals(UPDATED_AT, updated.updatedAt)
         } finally {
@@ -64,9 +66,10 @@ class FirestoreProductoDataSourceInstrumentedTest {
         precio: Long = 15_990,
         stock: Int = 5,
         descripcion: String = "Producto temporal para validar CRUD remoto",
-        updatedAt: Long = CREATED_AT
+        updatedAt: Long = CREATED_AT,
+        proveedor: String = "Proveedor Etapa 13"
     ) = Producto(PRODUCT_ID, "Producto Prueba Etapa 7", "ETAPA7-001", "Pruebas", "StockElectronico", descripcion,
-        precio, stock, Canal.AMBOS, CREATED_AT, updatedAt)
+        precio, stock, Canal.AMBOS, CREATED_AT, updatedAt, proveedor)
 
     private fun <T> assertSuccess(result: ProductoRemoteResult<T>): T {
         assertTrue("Resultado remoto inesperado: $result", result is ProductoRemoteResult.Success)
@@ -81,5 +84,6 @@ class FirestoreProductoDataSourceInstrumentedTest {
         private const val CREATED_AT = 1_700_000_000_000L
         private const val UPDATED_AT = 1_700_000_000_500L
         private const val UPDATED_DESCRIPTION = "Producto temporal actualizado en Etapa 7"
+        private const val UPDATED_PROVIDER = "Proveedor Etapa 13 actualizado"
     }
 }

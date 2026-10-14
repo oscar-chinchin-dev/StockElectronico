@@ -192,19 +192,19 @@ class ProductoRoomTest {
     }
 
     @Test
-    fun mergeRemotoLegacyPreservaProveedorLocalYSigueAplicandoCamposRemotos() = runBlocking(Dispatchers.IO) {
+    fun mergeRemotoMasNuevoReemplazaProveedorLocalComoParteDelPayloadCanonico() = runBlocking(Dispatchers.IO) {
         val dao = database.productoDao()
         dao.insertar(entity("local", 100, SyncStatus.SYNCED).copy(proveedor = "Proveedor Local", nombre = "LOCAL"))
 
         assertEquals(
             RemoteMergeResult.APPLIED,
-            dao.fusionarRemoto(entity("local", 200, SyncStatus.SYNCED).copy(nombre = "REMOTO"))
+            dao.fusionarRemoto(entity("local", 200, SyncStatus.SYNCED).copy(nombre = "REMOTO", proveedor = "Proveedor Remoto"))
         )
 
         val merged = dao.obtenerPorIdIncluyendoEliminados("local")!!
         assertEquals("REMOTO", merged.nombre)
         assertEquals(200, merged.updatedAt)
-        assertEquals("Proveedor Local", merged.proveedor)
+        assertEquals("Proveedor Remoto", merged.proveedor)
 
         dao.insertar(entity("vacio", 100, SyncStatus.SYNCED))
         dao.fusionarRemoto(entity("vacio", 200, SyncStatus.SYNCED))

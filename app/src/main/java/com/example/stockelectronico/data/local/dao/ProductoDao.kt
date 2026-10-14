@@ -62,8 +62,7 @@ interface ProductoDao {
             return RemoteMergeResult.KEPT_LOCAL
         }
         if (remoto.updatedAt < local.updatedAt) return RemoteMergeResult.KEPT_LOCAL
-        // TODO(Etapa 13): permitir que proveedor remoto participe cuando Firestore lo incluya.
-        guardarRemoto(remoto.copy(syncStatus = SyncStatus.SYNCED, proveedor = local.proveedor))
+        guardarRemoto(remoto.copy(syncStatus = SyncStatus.SYNCED))
         return RemoteMergeResult.APPLIED
     }
 

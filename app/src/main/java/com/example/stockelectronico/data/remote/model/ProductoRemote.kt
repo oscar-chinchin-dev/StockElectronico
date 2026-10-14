@@ -10,6 +10,7 @@ data class ProductoRemote(
     val precio: Long,
     val stock: Int,
     val canal: String,
+    val proveedor: String,
     val createdAt: Long,
     val updatedAt: Long
 ) {
@@ -22,6 +23,7 @@ data class ProductoRemote(
         FIELD_PRECIO to precio,
         FIELD_STOCK to stock,
         FIELD_CANAL to canal,
+        FIELD_PROVEEDOR to proveedor,
         FIELD_CREATED_AT to createdAt,
         FIELD_UPDATED_AT to updatedAt
     )
@@ -35,6 +37,7 @@ data class ProductoRemote(
         const val FIELD_PRECIO = "precio"
         const val FIELD_STOCK = "stock"
         const val FIELD_CANAL = "canal"
+        const val FIELD_PROVEEDOR = "proveedor"
         const val FIELD_CREATED_AT = "createdAt"
         const val FIELD_UPDATED_AT = "updatedAt"
     }

@@ -20,6 +20,7 @@ object ProductoRemoteMapper {
                 precio = producto.precio,
                 stock = producto.stock,
                 canal = producto.canal.name,
+                proveedor = producto.proveedor,
                 createdAt = producto.createdAt,
                 updatedAt = producto.updatedAt
             )
@@ -44,10 +45,16 @@ object ProductoRemoteMapper {
         val canal = (fields[ProductoRemote.FIELD_CANAL] as? String)
             ?.let { runCatching { Canal.valueOf(it) }.getOrNull() }
             ?: return invalid("canal es desconocido o inválido.")
+        val proveedor = if (fields.containsKey(ProductoRemote.FIELD_PROVEEDOR)) {
+            fields[ProductoRemote.FIELD_PROVEEDOR] as? String
+                ?: return invalid("proveedor debe ser texto.")
+        } else {
+            ""
+        }
         val createdAt = fields.requiredLong(ProductoRemote.FIELD_CREATED_AT) ?: return invalid("createdAt debe ser un entero Long.")
         val updatedAt = fields.requiredLong(ProductoRemote.FIELD_UPDATED_AT) ?: return invalid("updatedAt debe ser un entero Long.")
 
-        val producto = Producto(documentId, nombre, codigo, categoria, marca, descripcion, precio, stockLong.toInt(), canal, createdAt, updatedAt)
+        val producto = Producto(documentId, nombre, codigo, categoria, marca, descripcion, precio, stockLong.toInt(), canal, createdAt, updatedAt, proveedor)
         validate(producto)?.let { return invalid(it) }
         return ProductoRemoteResult.Success(producto)
     }
