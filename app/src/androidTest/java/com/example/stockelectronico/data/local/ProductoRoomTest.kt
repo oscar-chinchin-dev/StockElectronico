@@ -58,6 +58,7 @@ class ProductoRoomTest {
         assertEquals(987_654_321L, pendienteInicial.precio)
         assertEquals(Canal.AMBOS, pendienteInicial.canal)
         assertEquals(SyncStatus.PENDING, pendienteInicial.syncStatus)
+        assertEquals("Proveedor inicial", pendienteInicial.proveedor)
 
         // Inventario observable, búsqueda por nombre y SKU, y consulta individual activa.
         assertEquals(listOf(creado), repository.observarProductosActivos().first())
@@ -69,11 +70,12 @@ class ProductoRoomTest {
         // Actualización preserva createdAt, modifica updatedAt y queda pendiente.
         clock += 1L
         val actualizado = repository.actualizarProducto(
-            creado.copy(nombre = "Teclado mecánico actualizado", precio = 100L)
+            creado.copy(nombre = "Teclado mecánico actualizado", precio = 100L, proveedor = "Proveedor actualizado")
         )
         assertEquals(creado.createdAt, actualizado.createdAt)
         assertEquals(clock, actualizado.updatedAt)
         assertEquals(100L, repository.obtenerProductoActivoPorId(creado.id)?.precio)
+        assertEquals("Proveedor actualizado", repository.obtenerProductoActivoPorId(creado.id)?.proveedor)
         assertEquals(SyncStatus.PENDING, database.productoDao().obtenerPendientesDeSincronizacion().single().syncStatus)
 
         // PENDING_DELETE se excluye de todas las lecturas activas y continúa en pendientes.
@@ -189,6 +191,29 @@ class ProductoRoomTest {
         assertEquals(SyncStatus.SYNCED, stored.syncStatus)
     }
 
+    @Test
+    fun mergeRemotoLegacyPreservaProveedorLocalYSigueAplicandoCamposRemotos() = runBlocking(Dispatchers.IO) {
+        val dao = database.productoDao()
+        dao.insertar(entity("local", 100, SyncStatus.SYNCED).copy(proveedor = "Proveedor Local", nombre = "LOCAL"))
+
+        assertEquals(
+            RemoteMergeResult.APPLIED,
+            dao.fusionarRemoto(entity("local", 200, SyncStatus.SYNCED).copy(nombre = "REMOTO"))
+        )
+
+        val merged = dao.obtenerPorIdIncluyendoEliminados("local")!!
+        assertEquals("REMOTO", merged.nombre)
+        assertEquals(200, merged.updatedAt)
+        assertEquals("Proveedor Local", merged.proveedor)
+
+        dao.insertar(entity("vacio", 100, SyncStatus.SYNCED))
+        dao.fusionarRemoto(entity("vacio", 200, SyncStatus.SYNCED))
+        assertEquals("", dao.obtenerPorIdIncluyendoEliminados("vacio")!!.proveedor)
+
+        dao.fusionarRemoto(entity("nuevo", 200, SyncStatus.SYNCED))
+        assertEquals("", dao.obtenerPorIdIncluyendoEliminados("nuevo")!!.proveedor)
+    }
+
     private fun entity(id: String, updatedAt: Long, status: SyncStatus) = ProductoEntity(
         id, "Producto $id", "SKU-$id", "Categoria", "Marca", "", 1, 1,
         Canal.AMBOS, 1, updatedAt, status
@@ -205,6 +230,7 @@ class ProductoRoomTest {
         stock = 7,
         canal = Canal.AMBOS,
         createdAt = 0L,
-        updatedAt = 0L
+        updatedAt = 0L,
+        proveedor = "Proveedor inicial"
     )
 }

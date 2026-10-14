@@ -12,5 +12,6 @@ data class Producto(
     val stock: Int,
     val canal: Canal,
     val createdAt: Long,
-    val updatedAt: Long
+    val updatedAt: Long,
+    val proveedor: String = ""
 )

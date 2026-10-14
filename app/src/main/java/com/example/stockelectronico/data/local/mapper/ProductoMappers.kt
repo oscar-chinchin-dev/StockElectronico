@@ -16,7 +16,8 @@ fun Producto.toEntity(syncStatus: SyncStatus): ProductoEntity = ProductoEntity(
     canal = canal,
     createdAt = createdAt,
     updatedAt = updatedAt,
-    syncStatus = syncStatus
+    syncStatus = syncStatus,
+    proveedor = proveedor
 )
 
 fun ProductoEntity.toDomain(): Producto = Producto(
@@ -30,5 +31,6 @@ fun ProductoEntity.toDomain(): Producto = Producto(
     stock = stock,
     canal = canal,
     createdAt = createdAt,
-    updatedAt = updatedAt
+    updatedAt = updatedAt,
+    proveedor = proveedor
 )

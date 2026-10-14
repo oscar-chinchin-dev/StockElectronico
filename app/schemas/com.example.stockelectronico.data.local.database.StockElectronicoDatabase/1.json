@@ -1,0 +1,32 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "3ecdc60b5fb43041115bbd121601f6bc",
+    "entities": [
+      {
+        "tableName": "productos",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `nombre` TEXT NOT NULL, `codigo` TEXT NOT NULL, `categoria` TEXT NOT NULL, `marca` TEXT NOT NULL, `descripcion` TEXT NOT NULL, `precio` INTEGER NOT NULL, `stock` INTEGER NOT NULL, `canal` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `syncStatus` TEXT NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          { "fieldPath": "id", "columnName": "id", "affinity": "TEXT", "notNull": true },
+          { "fieldPath": "nombre", "columnName": "nombre", "affinity": "TEXT", "notNull": true },
+          { "fieldPath": "codigo", "columnName": "codigo", "affinity": "TEXT", "notNull": true },
+          { "fieldPath": "categoria", "columnName": "categoria", "affinity": "TEXT", "notNull": true },
+          { "fieldPath": "marca", "columnName": "marca", "affinity": "TEXT", "notNull": true },
+          { "fieldPath": "descripcion", "columnName": "descripcion", "affinity": "TEXT", "notNull": true },
+          { "fieldPath": "precio", "columnName": "precio", "affinity": "INTEGER", "notNull": true },
+          { "fieldPath": "stock", "columnName": "stock", "affinity": "INTEGER", "notNull": true },
+          { "fieldPath": "canal", "columnName": "canal", "affinity": "TEXT", "notNull": true },
+          { "fieldPath": "createdAt", "columnName": "createdAt", "affinity": "INTEGER", "notNull": true },
+          { "fieldPath": "updatedAt", "columnName": "updatedAt", "affinity": "INTEGER", "notNull": true },
+          { "fieldPath": "syncStatus", "columnName": "syncStatus", "affinity": "TEXT", "notNull": true }
+        ],
+        "primaryKey": { "autoGenerate": false, "columnNames": ["id"] }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '3ecdc60b5fb43041115bbd121601f6bc')"
+    ]
+  }
+}

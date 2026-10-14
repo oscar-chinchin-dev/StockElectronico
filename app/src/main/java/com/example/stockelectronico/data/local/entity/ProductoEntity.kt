@@ -1,6 +1,7 @@
 package com.example.stockelectronico.data.local.entity
 
 import androidx.room.Entity
+import androidx.room.ColumnInfo
 import androidx.room.PrimaryKey
 import com.example.stockelectronico.domain.model.Canal
 
@@ -17,5 +18,6 @@ data class ProductoEntity(
     val canal: Canal,
     val createdAt: Long,
     val updatedAt: Long,
-    val syncStatus: SyncStatus
+    val syncStatus: SyncStatus,
+    @ColumnInfo(defaultValue = "''") val proveedor: String = ""
 )

@@ -24,7 +24,7 @@ class AppContainer(context: Context) {
         context.applicationContext,
         StockElectronicoDatabase::class.java,
         StockElectronicoDatabase.DATABASE_NAME
-    ).build()
+    ).addMigrations(StockElectronicoDatabase.MIGRATION_1_2).build()
 
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val localProductoRepository = LocalProductoRepository(database.productoDao())
