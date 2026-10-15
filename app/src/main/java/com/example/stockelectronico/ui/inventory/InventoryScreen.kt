@@ -39,10 +39,11 @@ import java.util.Locale
 
 @Composable
 @OptIn(ExperimentalMaterial3Api::class)
-fun InventoryScreen(viewModel: InventoryViewModel, onProductSelected: (String) -> Unit, onCreateProduct: () -> Unit) {
+fun InventoryScreen(viewModel: InventoryViewModel, onProductSelected: (String) -> Unit, onCreateProduct: () -> Unit, onExternalCatalog: () -> Unit) {
     val state = viewModel.uiState.collectAsStateWithLifecycle().value
     Scaffold(
         topBar = { TopAppBar(title = { Text(stringResource(R.string.inventory_title)) }, actions = {
+            TextButton(onClick = onExternalCatalog) { Text(stringResource(R.string.external_catalog_title)) }
             TextButton(onClick = viewModel::synchronize) { Text(stringResource(R.string.sync_action)) }
         }) },
         floatingActionButton = { FloatingActionButton(onClick = onCreateProduct) { Text(stringResource(R.string.create_product_short)) } }

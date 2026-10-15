@@ -20,6 +20,8 @@ class MainActivity : ComponentActivity() {
                     StockElectronicoNavHost(
                         productoRepository = (application as StockElectronicoApplication)
                             .appContainer.productoRepository,
+                        externalCatalogRepository = (application as StockElectronicoApplication)
+                            .appContainer.externalCatalogRepository,
                         productoSyncManager = (application as StockElectronicoApplication)
                             .appContainer.productoSyncManager,
                         productoSyncLocalDataSource = (application as StockElectronicoApplication)

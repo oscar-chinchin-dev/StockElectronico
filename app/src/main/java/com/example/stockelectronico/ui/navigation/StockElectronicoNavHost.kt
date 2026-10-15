@@ -9,6 +9,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.stockelectronico.domain.repository.ProductoRepository
+import com.example.stockelectronico.domain.repository.ExternalCatalogRepository
 import com.example.stockelectronico.data.sync.ProductoSyncLocalDataSource
 import com.example.stockelectronico.data.sync.ProductoSyncManager
 import com.example.stockelectronico.ui.detail.ProductDetailScreen
@@ -20,16 +21,21 @@ import com.example.stockelectronico.ui.inventory.InventoryViewModelFactory
 import com.example.stockelectronico.ui.form.ProductFormScreen
 import com.example.stockelectronico.ui.form.ProductFormViewModel
 import com.example.stockelectronico.ui.form.ProductFormViewModelFactory
+import com.example.stockelectronico.ui.external.ExternalCatalogScreen
+import com.example.stockelectronico.ui.external.ExternalCatalogViewModel
+import com.example.stockelectronico.ui.external.ExternalCatalogViewModelFactory
 
 private const val INVENTORY_ROUTE = "inventory"
 private const val DETAIL_ROUTE = "product_detail"
 private const val PRODUCT_ID_ARGUMENT = "productId"
 private const val CREATE_ROUTE = "product_create"
 private const val EDIT_ROUTE = "product_edit"
+private const val EXTERNAL_CATALOG_ROUTE = "external_catalog"
 
 @Composable
 fun StockElectronicoNavHost(
     productoRepository: ProductoRepository,
+    externalCatalogRepository: ExternalCatalogRepository,
     productoSyncManager: ProductoSyncManager,
     productoSyncLocalDataSource: ProductoSyncLocalDataSource
 ) {
@@ -43,7 +49,11 @@ fun StockElectronicoNavHost(
             val viewModel: InventoryViewModel = viewModel(
                 factory = InventoryViewModelFactory(productoRepository, productoSyncManager, productoSyncLocalDataSource)
             )
-            InventoryScreen(viewModel, onProductSelected = { productId -> navController.navigate("$DETAIL_ROUTE/${Uri.encode(productId)}") }, onCreateProduct = { navController.navigate(CREATE_ROUTE) })
+            InventoryScreen(viewModel, onProductSelected = { productId -> navController.navigate("$DETAIL_ROUTE/${Uri.encode(productId)}") }, onCreateProduct = { navController.navigate(CREATE_ROUTE) }, onExternalCatalog = { navController.navigate(EXTERNAL_CATALOG_ROUTE) })
+        }
+        composable(EXTERNAL_CATALOG_ROUTE) {
+            val viewModel: ExternalCatalogViewModel = viewModel(factory = ExternalCatalogViewModelFactory(externalCatalogRepository, productoRepository))
+            ExternalCatalogScreen(viewModel, navController::popBackStack)
         }
         composable(
             route = "$DETAIL_ROUTE/{$PRODUCT_ID_ARGUMENT}",
