@@ -6,6 +6,9 @@ import com.example.stockelectronico.data.remote.FirebaseConnectionVerifier
 import com.example.stockelectronico.data.remote.FirestoreProductoDataSource
 import com.example.stockelectronico.data.remote.ProductoRemoteDataSource
 import com.example.stockelectronico.data.remote.auth.FirebaseAuthManager
+import com.example.stockelectronico.data.external.ExternalCatalogRepositoryImpl
+import com.example.stockelectronico.data.external.remote.DummyJsonProductsService
+import com.example.stockelectronico.data.external.remote.ExternalCatalogNetworkFactory
 import com.example.stockelectronico.data.local.database.StockElectronicoDatabase
 import com.example.stockelectronico.data.repository.LocalProductoRepository
 import com.example.stockelectronico.data.repository.SyncingProductoRepository
@@ -14,6 +17,7 @@ import com.example.stockelectronico.data.sync.ProductoSyncManager
 import com.example.stockelectronico.data.sync.RoomProductoSyncLocalDataSource
 import com.example.stockelectronico.data.sync.ProductoRealtimeSyncManager
 import com.example.stockelectronico.domain.repository.ProductoRepository
+import com.example.stockelectronico.domain.repository.ExternalCatalogRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -49,6 +53,14 @@ class AppContainer(context: Context) {
     /** Repository expuesto a UI: Room responde primero y la subida queda en segundo plano. */
     val productoRepository: ProductoRepository by lazy {
         SyncingProductoRepository(localProductoRepository, productoSyncManager, applicationScope)
+    }
+
+    /** Catálogo externo de solo lectura; no interactúa con Room ni Firestore. */
+    private val externalCatalogService: DummyJsonProductsService by lazy {
+        ExternalCatalogNetworkFactory.createService()
+    }
+    val externalCatalogRepository: ExternalCatalogRepository by lazy {
+        ExternalCatalogRepositoryImpl(externalCatalogService)
     }
 
     fun startRealtimeSync() = productoRealtimeSyncManager.start()
